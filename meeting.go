@@ -27,11 +27,13 @@ type Meeting struct {
 	Modified       time.Time `json:"modified"`
 }
 
+// CategoryAggregate aggregates multiple questions belonging to the same category to a question category level
 type CategoryAggregate struct {
 	CategoryID string  `json:"categoryID"`
 	Value      float32 `json:"value"`
 }
 
+// Aggregates stores aggregations associated with a meeting
 type Aggregates struct {
 	Category []CategoryAggregate `json:"category"`
 }

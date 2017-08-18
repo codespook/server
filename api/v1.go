@@ -7,22 +7,32 @@ import (
 	"net/http"
 )
 
-type v1 struct {
-	db data.Base
-
-	questionInterface *graphql.Interface
-	likertScale       *graphql.Object
-	outcomeSetType    *graphql.Object
-	aggregationEnum   *graphql.Enum
-	categoryType      *graphql.Object
-
+type meetingsTypes struct {
 	answerInterface   *graphql.Interface
 	intAnswer         *graphql.Object
 	categoryAggregate *graphql.Object
 	aggregates        *graphql.Object
 	meetingType       *graphql.Object
+}
 
+type organisationTypes struct {
 	organisationType *graphql.Object
+}
+
+type outcomeSetTypes struct {
+	questionInterface *graphql.Interface
+	likertScale       *graphql.Object
+	outcomeSetType    *graphql.Object
+	aggregationEnum   *graphql.Enum
+	categoryType      *graphql.Object
+}
+
+type v1 struct {
+	db data.Base
+
+	meetingsTypes
+	organisationTypes
+	outcomeSetTypes
 }
 
 func NewV1(db data.Base) (http.Handler, error) {
