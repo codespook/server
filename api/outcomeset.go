@@ -7,8 +7,10 @@ import (
 	"github.com/impactasaurus/server/auth"
 )
 
-func (v *v1) initOutcomeSetTypes() {
-	v.questionInterface = graphql.NewInterface(graphql.InterfaceConfig{
+func (v *v1) initOutcomeSetTypes(orgTypes organisationTypes) outcomeSetTypes {
+	ret := outcomeSetTypes{}
+
+	ret.questionInterface = graphql.NewInterface(graphql.InterfaceConfig{
 		Name:        "QuestionInterface",
 		Description: "The interface satisfied by all question types",
 		Fields: graphql.Fields{
@@ -32,22 +34,22 @@ func (v *v1) initOutcomeSetTypes() {
 		ResolveType: func(p graphql.ResolveTypeParams) *graphql.Object {
 			obj, ok := p.Value.(impact.Question)
 			if !ok {
-				return v.likertScale
+				return ret.likertScale
 			}
 			switch obj.Type {
 			case impact.LIKERT:
-				return v.likertScale
+				return ret.likertScale
 			default:
-				return v.likertScale
+				return ret.likertScale
 			}
 		},
 	})
 
-	v.likertScale = graphql.NewObject(graphql.ObjectConfig{
+	ret.likertScale = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "LikertScale",
 		Description: "Question gathering information using Likert Scales",
 		Interfaces: []*graphql.Interface{
-			v.questionInterface,
+			ret.questionInterface,
 		},
 		Fields: graphql.Fields{
 			"id": &graphql.Field{
@@ -152,7 +154,7 @@ func (v *v1) initOutcomeSetTypes() {
 		},
 	})
 
-	v.aggregationEnum = graphql.NewEnum(graphql.EnumConfig{
+	ret.aggregationEnum = graphql.NewEnum(graphql.EnumConfig{
 		Name:        "Aggregation",
 		Description: "Aggregation functions available",
 		Values: graphql.EnumValueConfigMap{
@@ -167,7 +169,7 @@ func (v *v1) initOutcomeSetTypes() {
 		},
 	})
 
-	v.categoryType = graphql.NewObject(graphql.ObjectConfig{
+	ret.categoryType = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "Category",
 		Description: "Categorises a set of questions. Used for aggregation",
 		Fields: graphql.Fields{
@@ -184,13 +186,13 @@ func (v *v1) initOutcomeSetTypes() {
 				Description: "Description of the category",
 			},
 			"aggregation": &graphql.Field{
-				Type:        graphql.NewNonNull(v.aggregationEnum),
+				Type:        graphql.NewNonNull(ret.aggregationEnum),
 				Description: "The aggregation applied to the category",
 			},
 		},
 	})
 
-	v.outcomeSetType = graphql.NewObject(graphql.ObjectConfig{
+	ret.outcomeSetType = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "OutcomeSet",
 		Description: "A set of questions to determine outcomes",
 		Fields: graphql.Fields{
@@ -203,7 +205,7 @@ func (v *v1) initOutcomeSetTypes() {
 				Description: "Organisation's unique ID",
 			},
 			"organisation": &graphql.Field{
-				Type:        graphql.NewNonNull(v.organisationType),
+				Type:        graphql.NewNonNull(orgTypes.organisationType),
 				Description: "The owning organisation of the outcome set",
 				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
 					obj, ok := p.Source.(impact.OutcomeSet)
@@ -222,13 +224,15 @@ func (v *v1) initOutcomeSetTypes() {
 				Description: "Information about the outcome set",
 			},
 			"questions": &graphql.Field{
-				Type:        graphql.NewNonNull(graphql.NewList(v.questionInterface)),
+				Type:        graphql.NewNonNull(graphql.NewList(ret.questionInterface)),
 				Description: "Questions associated with the outcome set",
 			},
 			"categories": &graphql.Field{
-				Type:        graphql.NewList(v.categoryType),
+				Type:        graphql.NewList(ret.categoryType),
 				Description: "Questions associated with the outcome set",
 			},
 		},
 	})
+
+	return ret
 }

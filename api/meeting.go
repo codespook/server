@@ -9,8 +9,10 @@ import (
 	"time"
 )
 
-func (v *v1) initMeetingTypes() {
-	v.answerInterface = graphql.NewInterface(graphql.InterfaceConfig{
+func (v *v1) initMeetingTypes(orgTypes organisationTypes, osTypes outcomeSetTypes) meetingTypes {
+	ret := meetingTypes{}
+
+	ret.answerInterface = graphql.NewInterface(graphql.InterfaceConfig{
 		Name:        "AnswerInterface",
 		Description: "The interface satisfied by all answer types",
 		Fields: graphql.Fields{
@@ -22,22 +24,22 @@ func (v *v1) initMeetingTypes() {
 		ResolveType: func(p graphql.ResolveTypeParams) *graphql.Object {
 			obj, ok := p.Value.(impact.Answer)
 			if !ok {
-				return v.intAnswer
+				return ret.intAnswer
 			}
 			switch obj.Type {
 			case impact.INT:
-				return v.intAnswer
+				return ret.intAnswer
 			default:
-				return v.intAnswer
+				return ret.intAnswer
 			}
 		},
 	})
 
-	v.intAnswer = graphql.NewObject(graphql.ObjectConfig{
+	ret.intAnswer = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "IntAnswer",
 		Description: "Answer containing an integer value",
 		Interfaces: []*graphql.Interface{
-			v.answerInterface,
+			ret.answerInterface,
 		},
 		Fields: graphql.Fields{
 			"questionID": &graphql.Field{
@@ -62,7 +64,7 @@ func (v *v1) initMeetingTypes() {
 		},
 	})
 
-	v.categoryAggregate = graphql.NewObject(graphql.ObjectConfig{
+	ret.categoryAggregate = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "CategoryAggregate",
 		Description: "An aggregation of answers to the category level",
 		Fields: graphql.Fields{
@@ -77,18 +79,18 @@ func (v *v1) initMeetingTypes() {
 		},
 	})
 
-	v.aggregates = graphql.NewObject(graphql.ObjectConfig{
+	ret.aggregates = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "Aggregates",
 		Description: "Aggregations of the meeting",
 		Fields: graphql.Fields{
 			"category": &graphql.Field{
-				Type:        graphql.NewList(v.categoryAggregate),
+				Type:        graphql.NewList(ret.categoryAggregate),
 				Description: "Answers aggregated to the category level",
 			},
 		},
 	})
 
-	v.meetingType = graphql.NewObject(graphql.ObjectConfig{
+	ret.meetingType = graphql.NewObject(graphql.ObjectConfig{
 		Name:        "Meeting",
 		Description: "A set of answers for an outcome set",
 		Fields: graphql.Fields{
@@ -109,7 +111,7 @@ func (v *v1) initMeetingTypes() {
 				Description: "The ID of the outcome set answered",
 			},
 			"outcomeSet": &graphql.Field{
-				Type:        graphql.NewNonNull(v.outcomeSetType),
+				Type:        graphql.NewNonNull(osTypes.outcomeSetType),
 				Description: "The outcome set answered",
 				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
 					obj, ok := p.Source.(impact.Meeting)
@@ -124,7 +126,7 @@ func (v *v1) initMeetingTypes() {
 				Description: "Organisation's unique ID",
 			},
 			"organisation": &graphql.Field{
-				Type:        graphql.NewNonNull(v.organisationType),
+				Type:        graphql.NewNonNull(orgTypes.organisationType),
 				Description: "The owning organisation of the outcome set",
 				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
 					obj, ok := p.Source.(impact.Meeting)
@@ -135,11 +137,11 @@ func (v *v1) initMeetingTypes() {
 				}),
 			},
 			"answers": &graphql.Field{
-				Type:        graphql.NewNonNull(graphql.NewList(v.answerInterface)),
+				Type:        graphql.NewNonNull(graphql.NewList(ret.answerInterface)),
 				Description: "The answers provided in the meeting",
 			},
 			"aggregates": &graphql.Field{
-				Type:        v.aggregates,
+				Type:        ret.aggregates,
 				Description: "Aggregations of the meeting's answers",
 				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
 					obj, ok := p.Source.(impact.Meeting)
@@ -194,4 +196,5 @@ func (v *v1) initMeetingTypes() {
 			},
 		},
 	})
+	return ret
 }

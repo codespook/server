@@ -8,20 +8,20 @@ import (
 	"github.com/impactasaurus/server/auth"
 )
 
-func (v *v1) getSchema() (*graphql.Schema, error) {
+func (v *v1) getSchema(orgTypes organisationTypes, osTypes outcomeSetTypes, meetTypes meetingTypes) (*graphql.Schema, error) {
 
 	queryType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
 			"outcomesets": &graphql.Field{
-				Type:        graphql.NewList(v.outcomeSetType),
+				Type:        graphql.NewList(osTypes.outcomeSetType),
 				Description: "Gather all outcome sets",
 				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
 					return v.db.GetOutcomeSets(u)
 				}),
 			},
 			"outcomeset": &graphql.Field{
-				Type:        v.outcomeSetType,
+				Type:        osTypes.outcomeSetType,
 				Description: "Gather a specific outcome set",
 				Args: graphql.FieldConfigArgument{
 					"id": &graphql.ArgumentConfig{
@@ -34,7 +34,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"organisation": &graphql.Field{
-				Type:        v.organisationType,
+				Type:        orgTypes.organisationType,
 				Description: "Get an organisation by ID",
 				Args: graphql.FieldConfigArgument{
 					"id": &graphql.ArgumentConfig{
@@ -47,7 +47,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"meeting": &graphql.Field{
-				Type:        v.meetingType,
+				Type:        meetTypes.meetingType,
 				Description: "Get a meeting by meeting ID",
 				Args: graphql.FieldConfigArgument{
 					"id": &graphql.ArgumentConfig{
@@ -60,7 +60,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"meetings": &graphql.Field{
-				Type:        graphql.NewList(v.meetingType),
+				Type:        graphql.NewList(meetTypes.meetingType),
 				Description: "Get all meetings associated with a beneficiary",
 				Args: graphql.FieldConfigArgument{
 					"beneficiary": &graphql.ArgumentConfig{
@@ -79,7 +79,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 		Name: "Mutation",
 		Fields: graphql.Fields{
 			"AddOutcomeSet": &graphql.Field{
-				Type:        v.outcomeSetType,
+				Type:        osTypes.outcomeSetType,
 				Description: "Create a new outcomeset",
 				Args: graphql.FieldConfigArgument{
 					"name": &graphql.ArgumentConfig{
@@ -98,7 +98,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"EditOutcomeSet": &graphql.Field{
-				Type:        v.outcomeSetType,
+				Type:        osTypes.outcomeSetType,
 				Description: "Edit an outcomeset",
 				Args: graphql.FieldConfigArgument{
 					"outcomeSetID": &graphql.ArgumentConfig{
@@ -139,7 +139,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"AddCategory": &graphql.Field{
-				Type:        v.outcomeSetType,
+				Type:        osTypes.outcomeSetType,
 				Description: "Add a category to the outcome set",
 				Args: graphql.FieldConfigArgument{
 					"outcomeSetID": &graphql.ArgumentConfig{
@@ -155,7 +155,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 						Description: "Description of the category",
 					},
 					"aggregation": &graphql.ArgumentConfig{
-						Type:        graphql.NewNonNull(v.aggregationEnum),
+						Type:        graphql.NewNonNull(osTypes.aggregationEnum),
 						Description: "The aggregation applied to the category",
 					},
 				},
@@ -171,7 +171,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"DeleteCategory": &graphql.Field{
-				Type:        v.outcomeSetType,
+				Type:        osTypes.outcomeSetType,
 				Description: "Remove a category from an outcome set. The category being removed must not be applied to any questions.",
 				Args: graphql.FieldConfigArgument{
 					"outcomeSetID": &graphql.ArgumentConfig{
@@ -193,7 +193,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"SetCategory": &graphql.Field{
-				Type:        v.outcomeSetType,
+				Type:        osTypes.outcomeSetType,
 				Description: "Set or remove the category associated with a question.",
 				Args: graphql.FieldConfigArgument{
 					"outcomeSetID": &graphql.ArgumentConfig{
@@ -226,7 +226,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"AddLikertQuestion": &graphql.Field{
-				Type:        v.outcomeSetType,
+				Type:        osTypes.outcomeSetType,
 				Description: "Add a likert scale question to an outcome set",
 				Args: graphql.FieldConfigArgument{
 					"outcomeSetID": &graphql.ArgumentConfig{
@@ -273,7 +273,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"DeleteQuestion": &graphql.Field{
-				Type:        v.outcomeSetType,
+				Type:        osTypes.outcomeSetType,
 				Description: "Remove a question from an outcome set",
 				Args: graphql.FieldConfigArgument{
 					"outcomeSetID": &graphql.ArgumentConfig{
@@ -295,7 +295,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"AddMeeting": &graphql.Field{
-				Type:        v.meetingType,
+				Type:        meetTypes.meetingType,
 				Description: "Create a new meeting",
 				Args: graphql.FieldConfigArgument{
 					"beneficiaryID": &graphql.ArgumentConfig{
@@ -323,7 +323,7 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 				}),
 			},
 			"AddLikertAnswer": &graphql.Field{
-				Type:        v.meetingType,
+				Type:        meetTypes.meetingType,
 				Description: "Provide an answer for a Likert Scale question",
 				Args: graphql.FieldConfigArgument{
 					"meetingID": &graphql.ArgumentConfig{
@@ -358,8 +358,8 @@ func (v *v1) getSchema() (*graphql.Schema, error) {
 		Query:    queryType,
 		Mutation: mutationType,
 		Types: []graphql.Type{
-			v.likertScale,
-			v.intAnswer,
+			osTypes.likertScale,
+			meetTypes.intAnswer,
 		},
 	})
 	if err != nil {
