@@ -18,11 +18,12 @@ func combineFields(toCombine ...graphql.Fields) (graphql.Fields, error) {
 	return final, nil
 }
 
-func (v *v1) getSchema(orgTypes organisationTypes, osTypes outcomeSetTypes, meetTypes meetingTypes) (*graphql.Schema, error) {
+func (v *v1) getSchema(orgTypes organisationTypes, osTypes outcomeSetTypes, meetTypes meetingTypes, repTypes reportTypes) (*graphql.Schema, error) {
 	queries, err := combineFields(
 		v.getMeetingQueries(meetTypes),
 		v.getOrgQueries(orgTypes),
 		v.getOSQueries(osTypes),
+		v.getRepQueries(repTypes),
 	)
 	if err != nil {
 		return nil, err

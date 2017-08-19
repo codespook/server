@@ -27,6 +27,10 @@ type outcomeSetTypes struct {
 	categoryType      *graphql.Object
 }
 
+type reportTypes struct {
+	JOCType *graphql.Object
+}
+
 type v1 struct {
 	db data.Base
 }
@@ -38,7 +42,8 @@ func NewV1(db data.Base) (http.Handler, error) {
 	orgTypes := v.initOrgTypes()
 	osTypes := v.initOutcomeSetTypes(orgTypes)
 	meetTypes := v.initMeetingTypes(orgTypes, osTypes)
-	schema, err := v.getSchema(orgTypes, osTypes, meetTypes)
+	repTypes := v.initRepTypes()
+	schema, err := v.getSchema(orgTypes, osTypes, meetTypes, repTypes)
 	if err != nil {
 		return nil, err
 	}
