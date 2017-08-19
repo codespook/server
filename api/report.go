@@ -46,7 +46,7 @@ func (v *v1) initRepTypes() reportTypes {
 				},
 				"warnings": &graphql.Field{
 					Type:        graphql.NewList(graphql.String),
-					Description: "Any warning messages for the user associated with this aggregation",
+					Description: "Any warning messages associated with this aggregation. Includes why beneficiaries could not be included",
 				},
 			},
 		})
@@ -94,6 +94,10 @@ func (v *v1) initRepTypes() reportTypes {
 					Type:        excluded,
 					Description: "Any questions or categories excluded from the report. This occurs when there are no instances of them associated with the considered beneficiaries",
 				},
+				"warnings": &graphql.Field{
+					Type:        graphql.NewList(graphql.String),
+					Description: "Any warning messages associated with the report. Contains users which could not be included.",
+				},
 			},
 		}),
 	}
@@ -135,7 +139,7 @@ Aggregates are calculated over all beneficiaries for the first and last meetings
 					return nil, err
 				}
 				osID := p.Args["questionSetID"].(string)
-				return logic.GetJOCServiceReport(startParsed, endParsed, osID, u)
+				return logic.GetJOCServiceReport(startParsed, endParsed, osID, v.db, u)
 			}),
 		},
 	}

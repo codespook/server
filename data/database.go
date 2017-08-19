@@ -42,6 +42,8 @@ type Base interface {
 
 	GetMeeting(id string, u auth.User) (impact.Meeting, error)
 	GetMeetingsForBeneficiary(beneficiary string, u auth.User) ([]impact.Meeting, error)
+	GetOSMeetingsInTimeRange(start, end time.Time, outcomeSetID string, u auth.User) ([]impact.Meeting, error)
+	GetOSMeetingsForBeneficiary(beneficiary string, outcomeSetID string, u auth.User) ([]impact.Meeting, error)
 	NewMeeting(beneficiaryID, outcomeSetID string, conducted time.Time, u auth.User) (impact.Meeting, error)
 	NewAnswer(meetingID string, answer impact.Answer, u auth.User) (impact.Meeting, error)
 }

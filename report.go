@@ -41,4 +41,5 @@ type JOCServiceReport struct {
 	QuestionAggregates JOCQAggs   `json:"questionAggregates"`
 	CategoryAggregates JOCCatAggs `json:"categoryAggregates"`
 	Excluded           Excluded   `json:"excluded"`
+	Warnings           []string   `json:"warnings"`
 }

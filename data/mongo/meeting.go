@@ -34,7 +34,9 @@ func (m *mongo) GetMeeting(id string, u auth.User) (impact.Meeting, error) {
 	return meeting, nil
 }
 
-func (m *mongo) GetMeetingsForBeneficiary(beneficiary string, u auth.User) ([]impact.Meeting, error) {
+type meetingGetter func(col *mgo.Collection, userOrg string) ([]impact.Meeting, error)
+
+func (m *mongo) getMeetings(inner meetingGetter, u auth.User) ([]impact.Meeting, error) {
 	col, closer := m.getMeetingCollection()
 	defer closer()
 
@@ -42,13 +44,45 @@ func (m *mongo) GetMeetingsForBeneficiary(beneficiary string, u auth.User) ([]im
 	if err != nil {
 		return nil, err
 	}
+	return inner(col, userOrg)
+}
 
-	results := []impact.Meeting{}
-	err = col.Find(bson.M{
-		"beneficiary":    beneficiary,
-		"organisationID": userOrg,
-	}).All(&results)
-	return results, err
+func (m *mongo) GetMeetingsForBeneficiary(beneficiary string, u auth.User) ([]impact.Meeting, error) {
+	return m.getMeetings(func(col *mgo.Collection, userOrg string) ([]impact.Meeting, error) {
+		results := []impact.Meeting{}
+		err := col.Find(bson.M{
+			"beneficiary":    beneficiary,
+			"organisationID": userOrg,
+		}).All(&results)
+		return results, err
+	}, u)
+}
+
+func (m *mongo) GetOSMeetingsForBeneficiary(beneficiary string, outcomeSetID string, u auth.User) ([]impact.Meeting, error) {
+	return m.getMeetings(func(col *mgo.Collection, userOrg string) ([]impact.Meeting, error) {
+		results := []impact.Meeting{}
+		err := col.Find(bson.M{
+			"beneficiary":    beneficiary,
+			"organisationID": userOrg,
+			"outcomeSetID":   outcomeSetID,
+		}).All(&results)
+		return results, err
+	}, u)
+}
+
+func (m *mongo) GetOSMeetingsInTimeRange(start, end time.Time, outcomeSetID string, u auth.User) ([]impact.Meeting, error) {
+	return m.getMeetings(func(col *mgo.Collection, userOrg string) ([]impact.Meeting, error) {
+		results := []impact.Meeting{}
+		err := col.Find(bson.M{
+			"organisationID": userOrg,
+			"outcomeSetID":   outcomeSetID,
+			"conducted": bson.M{
+				"$gte": start,
+				"$lte": end,
+			},
+		}).All(&results)
+		return results, err
+	}, u)
 }
 
 func (m *mongo) NewMeeting(beneficiaryID, outcomeSetID string, conducted time.Time, u auth.User) (impact.Meeting, error) {

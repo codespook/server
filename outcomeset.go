@@ -68,3 +68,14 @@ func (os *OutcomeSet) GetQuestion(qID string) *Question {
 	}
 	return nil
 }
+
+// ActiveQuestions returns only the currently active questions (i.e. not deleted)
+func (os *OutcomeSet) ActiveQuestions() []Question {
+	qs := make([]Question, 0, len(os.Questions))
+	for _, q := range os.Questions {
+		if !q.Deleted {
+			qs = append(qs, q)
+		}
+	}
+	return qs
+}
