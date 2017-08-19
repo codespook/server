@@ -198,3 +198,34 @@ func (v *v1) initMeetingTypes(orgTypes organisationTypes, osTypes outcomeSetType
 	})
 	return ret
 }
+
+func (v *v1) getMeetingQueries(meetTypes meetingTypes) graphql.Fields {
+	return graphql.Fields{
+		"meeting": &graphql.Field{
+			Type:        meetTypes.meetingType,
+			Description: "Get a meeting by meeting ID",
+			Args: graphql.FieldConfigArgument{
+				"id": &graphql.ArgumentConfig{
+					Description: "The ID of the meeting",
+					Type:        graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
+				return v.db.GetMeeting(p.Args["id"].(string), u)
+			}),
+		},
+		"meetings": &graphql.Field{
+			Type:        graphql.NewList(meetTypes.meetingType),
+			Description: "Get all meetings associated with a beneficiary",
+			Args: graphql.FieldConfigArgument{
+				"beneficiary": &graphql.ArgumentConfig{
+					Description: "The ID of the beneficiary",
+					Type:        graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
+				return v.db.GetMeetingsForBeneficiary(p.Args["beneficiary"].(string), u)
+			}),
+		},
+	}
+}

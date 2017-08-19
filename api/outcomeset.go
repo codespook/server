@@ -236,3 +236,28 @@ func (v *v1) initOutcomeSetTypes(orgTypes organisationTypes) outcomeSetTypes {
 
 	return ret
 }
+
+func (v *v1) getOSQueries(osTypes outcomeSetTypes) graphql.Fields {
+	return graphql.Fields{
+		"outcomesets": &graphql.Field{
+			Type:        graphql.NewList(osTypes.outcomeSetType),
+			Description: "Gather all outcome sets",
+			Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
+				return v.db.GetOutcomeSets(u)
+			}),
+		},
+		"outcomeset": &graphql.Field{
+			Type:        osTypes.outcomeSetType,
+			Description: "Gather a specific outcome set",
+			Args: graphql.FieldConfigArgument{
+				"id": &graphql.ArgumentConfig{
+					Description: "The ID of the outcomeset",
+					Type:        graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
+				return v.db.GetOutcomeSet(p.Args["id"].(string), u)
+			}),
+		},
+	}
+}

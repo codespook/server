@@ -3,6 +3,7 @@ package api
 import (
 	"time"
 
+	"fmt"
 	"github.com/graphql-go/graphql"
 	impact "github.com/impactasaurus/server"
 	"github.com/impactasaurus/server/auth"
@@ -10,69 +11,24 @@ import (
 
 func (v *v1) getSchema(orgTypes organisationTypes, osTypes outcomeSetTypes, meetTypes meetingTypes) (*graphql.Schema, error) {
 
+	toCombine := make([]graphql.Fields, 3)
+	toCombine[0] = v.getMeetingQueries(meetTypes)
+	toCombine[1] = v.getOrgQueries(orgTypes)
+	toCombine[2] = v.getOSQueries(osTypes)
+
+	final := graphql.Fields{}
+	for _, toAdd := range toCombine {
+		for k, v := range toAdd {
+			if _, ok := final[k]; ok {
+				return nil, fmt.Errorf("Query with name %s already exists", k)
+			}
+			final[k] = v
+		}
+	}
+
 	queryType := graphql.NewObject(graphql.ObjectConfig{
-		Name: "Query",
-		Fields: graphql.Fields{
-			"outcomesets": &graphql.Field{
-				Type:        graphql.NewList(osTypes.outcomeSetType),
-				Description: "Gather all outcome sets",
-				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
-					return v.db.GetOutcomeSets(u)
-				}),
-			},
-			"outcomeset": &graphql.Field{
-				Type:        osTypes.outcomeSetType,
-				Description: "Gather a specific outcome set",
-				Args: graphql.FieldConfigArgument{
-					"id": &graphql.ArgumentConfig{
-						Description: "The ID of the outcomeset",
-						Type:        graphql.NewNonNull(graphql.String),
-					},
-				},
-				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
-					return v.db.GetOutcomeSet(p.Args["id"].(string), u)
-				}),
-			},
-			"organisation": &graphql.Field{
-				Type:        orgTypes.organisationType,
-				Description: "Get an organisation by ID",
-				Args: graphql.FieldConfigArgument{
-					"id": &graphql.ArgumentConfig{
-						Description: "The ID of the organisation",
-						Type:        graphql.NewNonNull(graphql.String),
-					},
-				},
-				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
-					return v.db.GetOrganisation(p.Args["id"].(string), u)
-				}),
-			},
-			"meeting": &graphql.Field{
-				Type:        meetTypes.meetingType,
-				Description: "Get a meeting by meeting ID",
-				Args: graphql.FieldConfigArgument{
-					"id": &graphql.ArgumentConfig{
-						Description: "The ID of the meeting",
-						Type:        graphql.NewNonNull(graphql.String),
-					},
-				},
-				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
-					return v.db.GetMeeting(p.Args["id"].(string), u)
-				}),
-			},
-			"meetings": &graphql.Field{
-				Type:        graphql.NewList(meetTypes.meetingType),
-				Description: "Get all meetings associated with a beneficiary",
-				Args: graphql.FieldConfigArgument{
-					"beneficiary": &graphql.ArgumentConfig{
-						Description: "The ID of the beneficiary",
-						Type:        graphql.NewNonNull(graphql.String),
-					},
-				},
-				Resolve: userRestrictedResolver(func(p graphql.ResolveParams, u auth.User) (interface{}, error) {
-					return v.db.GetMeetingsForBeneficiary(p.Args["beneficiary"].(string), u)
-				}),
-			},
-		},
+		Name:   "Query",
+		Fields: final,
 	})
 
 	mutationType := graphql.NewObject(graphql.ObjectConfig{
