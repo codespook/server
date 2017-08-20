@@ -58,3 +58,12 @@ func (a Answer) ToFloat() (float32, error) {
 		return 0, errors.New("Cannot convert answer to float")
 	}
 }
+
+func (m *Meeting) GetAnswer(questionID string) *Answer {
+	for _, a := range m.Answers {
+		if a.QuestionID == questionID {
+			return &a
+		}
+	}
+	return nil
+}

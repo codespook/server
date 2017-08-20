@@ -1,22 +1,19 @@
 package server
 
-// BenAgg stores aggregations of values over multiple beneficiaries
-type BenAgg struct {
+// CatBenAgg is a BenAgg associated with a question category
+type CatBenAgg struct {
+	CategoryID     string   `json:"categoryID"`
 	Value          float32  `json:"value"`
 	BeneficiaryIDs []string `json:"beneficiaryIDs"`
 	Warnings       []string `json:"warnings"`
 }
 
-// CatBenAgg is a BenAgg associated with a question category
-type CatBenAgg struct {
-	CategoryID string `json:"categoryID"`
-	BenAgg
-}
-
 // QBenAgg is a BenAgg associated with a question
 type QBenAgg struct {
-	QuestionID string `json:"questionID"`
-	BenAgg
+	QuestionID     string   `json:"questionID"`
+	Value          float32  `json:"value"`
+	BeneficiaryIDs []string `json:"beneficiaryIDs"`
+	Warnings       []string `json:"warnings"`
 }
 
 type Excluded struct {

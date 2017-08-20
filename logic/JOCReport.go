@@ -54,31 +54,157 @@ func (j *jocReporter) getFirstAndLastMeetings(lastMeetings map[string]impact.Mee
 			log.Printf("Getting benificary's (%s) meetings failed: %s", ben, err.Error())
 			continue
 		}
+		if len(benMeetings) == 0 {
+			j.addGlobalWarning(fmt.Sprintf("Could not include beneficiary %s as we could not find their first meeting. Please contact support.", ben))
+			continue
+		}
 		// 	 find first meeting
-		var firstMeeting *impact.Meeting
+		var firstMeeting impact.Meeting
+		found := false
 		for _, meeting := range benMeetings {
-			if firstMeeting == nil || firstMeeting.Conducted.After(meeting.Conducted) {
-				firstMeeting = &meeting
+			if meeting.ID != lastMeeting.ID &&
+				(!found || firstMeeting.Conducted.After(meeting.Conducted)) {
+				firstMeeting = meeting
+				found = true
 			}
 		}
-		if firstMeeting == nil {
+		if !found {
 			j.addGlobalWarning(fmt.Sprintf("Beneficiary %s was not included as they only have a single meeting recorded", ben))
 			continue
 		}
 		firstAndLast[ben] = firstAndLastMeetings{
-			first: *firstMeeting,
+			first: firstMeeting,
 			last:  lastMeeting,
 		}
 	}
 	return firstAndLast
 }
 
+type beneficiaryAggregation struct {
+	first         []float32
+	last          []float32
+	diff          []float32
+	beneficiaries []string
+	warnings      []string
+	aggTarget     string
+}
+
+func newBenAgg(aggTargetID string, noBens int) *beneficiaryAggregation {
+	return &beneficiaryAggregation{
+		first:         make([]float32, 0, noBens),
+		last:          make([]float32, 0, noBens),
+		diff:          make([]float32, 0, noBens),
+		beneficiaries: make([]string, 0, noBens),
+		warnings:      make([]string, 0, noBens),
+		aggTarget:     aggTargetID,
+	}
+}
+
+func (ba *beneficiaryAggregation) addBenificaryValues(benID string, first, last float32) {
+	ba.beneficiaries = append(ba.beneficiaries, benID)
+	ba.first = append(ba.first, first)
+	ba.last = append(ba.last, last)
+	ba.diff = append(ba.diff, last-first)
+}
+
+func (ba *beneficiaryAggregation) addBenificaryWarning(warning string) {
+	ba.warnings = append(ba.warnings, warning)
+}
+
+func (ba *beneficiaryAggregation) aggregateQuestions(j *jocReporter, aggs *impact.JOCQAggs) {
+	if len(ba.first) == 0 {
+		j.excludedQuestionIDs = append(j.excludedQuestionIDs, ba.aggTarget)
+		return
+	}
+	getBenAgg := func(toAdd []float32) impact.QBenAgg {
+		return impact.QBenAgg{
+			QuestionID:     ba.aggTarget,
+			Warnings:       ba.warnings,
+			BeneficiaryIDs: ba.beneficiaries,
+			Value:          mean(toAdd),
+		}
+	}
+	aggs.First = append(aggs.First, getBenAgg(ba.first))
+	aggs.Last = append(aggs.Last, getBenAgg(ba.last))
+	aggs.Delta = append(aggs.Delta, getBenAgg(ba.diff))
+}
+
+func (ba *beneficiaryAggregation) aggregateCategories(j *jocReporter, aggs *impact.JOCCatAggs) {
+	if len(ba.first) == 0 {
+		j.excludedCategoryIDs = append(j.excludedCategoryIDs, ba.aggTarget)
+		return
+	}
+	getBenAgg := func(toAdd []float32) impact.CatBenAgg {
+		fmt.Println(ba.beneficiaries)
+		return impact.CatBenAgg{
+			CategoryID:     ba.aggTarget,
+			Warnings:       ba.warnings,
+			BeneficiaryIDs: ba.beneficiaries,
+			Value:          mean(toAdd),
+		}
+	}
+	aggs.First = append(aggs.First, getBenAgg(ba.first))
+	aggs.Last = append(aggs.Last, getBenAgg(ba.last))
+	aggs.Delta = append(aggs.Delta, getBenAgg(ba.diff))
+}
+
 func (j *jocReporter) getQuestionAggregations(firstAndLast map[string]firstAndLastMeetings) impact.JOCQAggs {
-	return impact.JOCQAggs{}
+	activeQs := j.os.ActiveQuestions()
+	ret := impact.JOCQAggs{
+		First: make([]impact.QBenAgg, 0, len(activeQs)),
+		Last:  make([]impact.QBenAgg, 0, len(activeQs)),
+		Delta: make([]impact.QBenAgg, 0, len(activeQs)),
+	}
+	for _, q := range activeQs {
+		benAggregator := newBenAgg(q.ID, len(firstAndLast))
+		for ben, fl := range firstAndLast {
+			firstAnswer := fl.first.GetAnswer(q.ID)
+			lastAnswer := fl.last.GetAnswer(q.ID)
+			if firstAnswer == nil || lastAnswer == nil {
+				benAggregator.addBenificaryWarning(fmt.Sprintf("Beneficiary %s not included as the question was not answered in both the first and last meetings", ben))
+				continue
+			}
+			if !firstAnswer.IsNumeric() || !lastAnswer.IsNumeric() {
+				benAggregator.addBenificaryWarning(fmt.Sprintf("Beneficiary %s not included as the answers were not of an expected format", ben))
+				continue
+			}
+			fV, fE := firstAnswer.ToFloat()
+			lV, lE := lastAnswer.ToFloat()
+			if fE != nil || lE != nil {
+				benAggregator.addBenificaryWarning(fmt.Sprintf("Beneficiary %s not included as the answers were not of an expected format", ben))
+				continue
+			}
+			benAggregator.addBenificaryValues(ben, fV, lV)
+		}
+		benAggregator.aggregateQuestions(j, &ret)
+	}
+	return ret
 }
 
 func (j *jocReporter) getCategoryAggregations(firstAndLast map[string]firstAndLastMeetings) impact.JOCCatAggs {
-	return impact.JOCCatAggs{}
+	ret := impact.JOCCatAggs{
+		First: make([]impact.CatBenAgg, 0, len(j.os.Categories)),
+		Last:  make([]impact.CatBenAgg, 0, len(j.os.Categories)),
+		Delta: make([]impact.CatBenAgg, 0, len(j.os.Categories)),
+	}
+	for _, cat := range j.os.Categories {
+		benAggregator := newBenAgg(cat.ID, len(firstAndLast))
+		for ben, fl := range firstAndLast {
+			fCat, fE := GetCategoryAggregate(fl.first, cat.ID, j.os)
+			sCat, sE := GetCategoryAggregate(fl.last, cat.ID, j.os)
+			if fE != nil || sE != nil {
+				benAggregator.addBenificaryWarning(fmt.Sprintf("Beneficiary %s not included because the category aggregation failed", ben))
+				continue
+			}
+			if fCat == nil || sCat == nil {
+				benAggregator.addBenificaryWarning(fmt.Sprintf("Beneficiary %s not included as they had no answers belonging to the category", ben))
+				continue
+			}
+			benAggregator.addBenificaryValues(ben, fCat.Value, sCat.Value)
+		}
+		benAggregator.aggregateCategories(j, &ret)
+	}
+	return ret
 }
 
 func (j *jocReporter) getBeneficiaryIDs(firstAndLast map[string]firstAndLastMeetings) []string {
@@ -100,23 +226,16 @@ func GetJOCServiceReport(start, end time.Time, questionSetID string, db data.Bas
 		u:             u,
 		os:            os,
 	}
-	// DB: get meetings in time range for a question set
 	meetingsInRange, err := db.GetOSMeetingsInTimeRange(start, end, questionSetID, u)
 	if err != nil {
 		return nil, err
 	}
-	// find last meeting for each beneficiary
 	lastMeetings := j.getLastMeetingForEachBen(meetingsInRange)
-	// for each ben
 	firstAndLast := j.getFirstAndLastMeetings(lastMeetings)
-	//   check both are full
-	// 	 calc delta
-	//   store
-	// aggregate
 	qAggs := j.getQuestionAggregations(firstAndLast)
 	cAggs := j.getCategoryAggregations(firstAndLast)
 
-	return &impact.JOCServiceReport{
+	ret := impact.JOCServiceReport{
 		Excluded: impact.Excluded{
 			CategoryIDs: j.excludedCategoryIDs,
 			QuestionIDs: j.excludedQuestionIDs,
@@ -125,5 +244,7 @@ func GetJOCServiceReport(start, end time.Time, questionSetID string, db data.Bas
 		CategoryAggregates: cAggs,
 		QuestionAggregates: qAggs,
 		Warnings:           j.globalWarnings,
-	}, nil
+	}
+	fmt.Println(ret)
+	return &ret, nil
 }

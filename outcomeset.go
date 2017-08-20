@@ -37,6 +37,15 @@ type OutcomeSet struct {
 	Deleted        bool       `json:"deleted"`
 }
 
+func (os *OutcomeSet) GetCategory(catID string) *Category {
+	for _, c := range os.Categories {
+		if c.ID == catID {
+			return &c
+		}
+	}
+	return nil
+}
+
 // GetCategoryQuestions gets questions belonging to the provided category ID
 // Does not return archived questions
 func (os *OutcomeSet) GetCategoryQuestions(catID string) []Question {
@@ -60,6 +69,7 @@ func (os *OutcomeSet) GetArchivedCategoryQuestions(catID string) []Question {
 	return out
 }
 
+// GetQuestion returns the question with the provided qID or nil
 func (os *OutcomeSet) GetQuestion(qID string) *Question {
 	for _, q := range os.Questions {
 		if q.ID == qID {
