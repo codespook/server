@@ -1,12 +1,15 @@
 package logic
 
 import (
+	"errors"
 	"fmt"
+	"log"
+	"sort"
+	"time"
+
 	impact "github.com/impactasaurus/server"
 	"github.com/impactasaurus/server/auth"
 	"github.com/impactasaurus/server/data"
-	"log"
-	"time"
 )
 
 type firstAndLastMeetings struct {
@@ -102,6 +105,7 @@ func newBenAgg(aggTargetID string, noBens int) *beneficiaryAggregation {
 
 func (ba *beneficiaryAggregation) addBenificaryValues(benID string, first, last float32) {
 	ba.beneficiaries = append(ba.beneficiaries, benID)
+	sort.Strings(ba.beneficiaries)
 	ba.first = append(ba.first, first)
 	ba.last = append(ba.last, last)
 	ba.diff = append(ba.diff, last-first)
@@ -135,7 +139,6 @@ func (ba *beneficiaryAggregation) aggregateCategories(j *jocReporter, aggs *impa
 		return
 	}
 	getBenAgg := func(toAdd []float32) impact.CatBenAgg {
-		fmt.Println(ba.beneficiaries)
 		return impact.CatBenAgg{
 			CategoryID:     ba.aggTarget,
 			Warnings:       ba.warnings,
@@ -212,6 +215,7 @@ func (j *jocReporter) getBeneficiaryIDs(firstAndLast map[string]firstAndLastMeet
 	for b := range firstAndLast {
 		bens = append(bens, b)
 	}
+	sort.Strings(bens)
 	return bens
 }
 
@@ -221,15 +225,23 @@ func GetJOCServiceReport(start, end time.Time, questionSetID string, db data.Bas
 		return nil, err
 	}
 	j := jocReporter{
-		questionSetID: questionSetID,
-		db:            db,
-		u:             u,
-		os:            os,
+		questionSetID:       questionSetID,
+		db:                  db,
+		u:                   u,
+		os:                  os,
+		globalWarnings:      []string{},
+		excludedCategoryIDs: []string{},
+		excludedQuestionIDs: []string{},
 	}
+
 	meetingsInRange, err := db.GetOSMeetingsInTimeRange(start, end, questionSetID, u)
 	if err != nil {
 		return nil, err
 	}
+	if len(meetingsInRange) == 0 {
+		return nil, errors.New("No meetings found for the question set within the given date range")
+	}
+
 	lastMeetings := j.getLastMeetingForEachBen(meetingsInRange)
 	firstAndLast := j.getFirstAndLastMeetings(lastMeetings)
 	qAggs := j.getQuestionAggregations(firstAndLast)
@@ -245,6 +257,5 @@ func GetJOCServiceReport(start, end time.Time, questionSetID string, db data.Bas
 		QuestionAggregates: qAggs,
 		Warnings:           j.globalWarnings,
 	}
-	fmt.Println(ret)
 	return &ret, nil
 }
