@@ -1,6 +1,10 @@
 language: go
 go:
 - '1.8'
+before_install:
+ - go get -u github.com/kardianos/govendor
+install:
+ - govendor sync
 deploy:
   provider: heroku
   api_key:
