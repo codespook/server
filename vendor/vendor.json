@@ -3,10 +3,22 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "mrz/kicZiUaHxkyfvC/DyQcr8Do=",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "adab96458c51a58dc1783b3335dcce5461522e75",
+			"revisionTime": "2017-07-11T18:34:51Z"
+		},
+		{
 			"checksumSHA1": "GXOurDGgsLmJs0wounpdWZZRSGw=",
 			"path": "github.com/dgrijalva/jwt-go",
 			"revision": "a539ee1a749a2b895533f979515ac7e6e0f5b650",
 			"revisionTime": "2017-06-08T00:51:49Z"
+		},
+		{
+			"checksumSHA1": "eF2jojWx8CC89wOXJ/A6dTF1F3o=",
+			"path": "github.com/golang/mock/gomock",
+			"revision": "18f6dd13ccdd227b8ebc546ca95cd62a02f3970c",
+			"revisionTime": "2017-08-22T21:49:03Z"
 		},
 		{
 			"checksumSHA1": "lHgtjrs/HC05haPekbAUOuQRYKA=",
@@ -87,6 +99,12 @@
 			"revisionTime": "2017-05-23T19:07:22Z"
 		},
 		{
+			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
+			"revisionTime": "2016-01-10T10:55:54Z"
+		},
+		{
 			"checksumSHA1": "lZmPAbekxLbMFQirB/vzbdI+5O8=",
 			"path": "github.com/rs/cors",
 			"revision": "8dd4211afb5d08dbb39a533b9bb9e4b486351df6",
@@ -97,6 +115,12 @@
 			"path": "github.com/satori/go.uuid",
 			"revision": "5bf94b69c6b68ee1b541973bb8e1144db23a194b",
 			"revisionTime": "2017-03-21T23:07:31Z"
+		},
+		{
+			"checksumSHA1": "mGbTYZ8dHVTiPTTJu3ktp+84pPI=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"revisionTime": "2017-07-05T02:17:15Z"
 		},
 		{
 			"checksumSHA1": "Y+HGqEkYM15ir+J93MEaHdyFy0c=",
