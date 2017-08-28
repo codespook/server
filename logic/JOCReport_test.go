@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const questionSetID = "qid"
+
 func setupWrapper(t *testing.T, inner func(*mock.MockUser, *mock.MockBase)) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -187,12 +189,8 @@ func getDefaultMeetings(start, end time.Time, questionSetID string) map[string]i
 	}
 }
 
-func TestJOCReport(t *testing.T) {
-	questionSetID := "qid"
-	end := time.Now()
-	start := end.Add(-time.Hour * 24)
-
-	os := impact.OutcomeSet{
+func getDefaultOutcomeSet(questionSetID string) impact.OutcomeSet {
+	return impact.OutcomeSet{
 		ID: questionSetID,
 		Questions: []impact.Question{{
 			ID:         "Q1",
@@ -219,7 +217,12 @@ func TestJOCReport(t *testing.T) {
 			Aggregation: impact.MEAN,
 		}},
 	}
+}
 
+func TestJOCReport(t *testing.T) {
+	end := time.Now()
+	start := end.Add(-time.Hour * 24)
+	os := getDefaultOutcomeSet(questionSetID)
 	meetings := getDefaultMeetings(start, end, questionSetID)
 
 	inRangeMeetings := []impact.Meeting{
@@ -407,7 +410,133 @@ func TestUsersWithOnlyOneMeeting(t *testing.T) {
 	})
 }
 
-// categories with no questions
-// questions with no questions
-// beneficiaries missing first/last question
-// getting ben's meeting failure
+func TestCategoryWithNoQuestions(t *testing.T) {
+	end := time.Unix(10000, 0)
+	start := end.Add(-time.Hour * 24)
+	os := getDefaultOutcomeSet(questionSetID)
+	meetings := getDefaultMeetings(start, end, questionSetID)
+
+	for i := range os.Questions {
+		os.Questions[i].CategoryID = "C1"
+	}
+
+	inRangeMeetings := []impact.Meeting{
+		meetings["B1M2"],
+	}
+	b1Meetings := []impact.Meeting{meetings["B1M1"], meetings["B1M2"]}
+
+	setupWrapper(t, func(mockUser *mock.MockUser, mockDB *mock.MockBase) {
+		mockDB.EXPECT().GetOutcomeSet(questionSetID, mockUser).Return(os, nil)
+		mockDB.EXPECT().GetOSMeetingsInTimeRange(start, end, questionSetID, mockUser).Return(inRangeMeetings, nil)
+		mockDB.EXPECT().GetOSMeetingsForBeneficiary("B1", questionSetID, mockUser).Return(b1Meetings, nil)
+
+		result, err := logic.GetJOCServiceReport(start, end, questionSetID, mockDB, mockUser)
+		assert.NoError(t, err)
+		assert.EqualValues(t, []string{"C2"}, result.Excluded.CategoryIDs)
+		assert.Len(t, result.Warnings, 0)
+	})
+}
+
+func TestQuestionWithNoAnswers(t *testing.T) {
+	end := time.Unix(10000, 0)
+	start := end.Add(-time.Hour * 24)
+	os := getDefaultOutcomeSet(questionSetID)
+	meetings := getDefaultMeetings(start, end, questionSetID)
+
+	// remove question
+	b1m1 := meetings["B1M1"]
+	b1m2 := meetings["B1M2"]
+	questionRemoved := b1m1.Answers[0].QuestionID
+	b1m1.Answers = b1m1.Answers[1:]
+	for i, a := range b1m2.Answers {
+		if a.QuestionID == questionRemoved {
+			b1m2.Answers = append(b1m2.Answers[:i], b1m2.Answers[i+1:]...)
+			break
+		}
+	}
+
+	inRangeMeetings := []impact.Meeting{b1m1}
+	b1Meetings := []impact.Meeting{b1m1, b1m2}
+
+	setupWrapper(t, func(mockUser *mock.MockUser, mockDB *mock.MockBase) {
+		mockDB.EXPECT().GetOutcomeSet(questionSetID, mockUser).Return(os, nil)
+		mockDB.EXPECT().GetOSMeetingsInTimeRange(start, end, questionSetID, mockUser).Return(inRangeMeetings, nil)
+		mockDB.EXPECT().GetOSMeetingsForBeneficiary("B1", questionSetID, mockUser).Return(b1Meetings, nil)
+
+		result, err := logic.GetJOCServiceReport(start, end, questionSetID, mockDB, mockUser)
+		assert.NoError(t, err)
+		assert.EqualValues(t, []string{questionRemoved}, result.Excluded.QuestionIDs)
+		assert.Len(t, result.Warnings, 0)
+	})
+}
+
+func TestBenMeetingMissingQuestion(t *testing.T) {
+	end := time.Unix(10000, 0)
+	start := end.Add(-time.Hour * 24)
+	os := getDefaultOutcomeSet(questionSetID)
+	meetings := getDefaultMeetings(start, end, questionSetID)
+
+	// remove question
+	b1m1 := meetings["B1M1"]
+	questionRemoved := b1m1.Answers[0].QuestionID
+	b1m1.Answers = b1m1.Answers[1:]
+
+	inRangeMeetings := []impact.Meeting{b1m1, meetings["B2M1"]}
+	b1Meetings := []impact.Meeting{b1m1, meetings["B1M2"]}
+	b2Meetings := []impact.Meeting{meetings["B2M1"], meetings["B1M2"]}
+
+	setupWrapper(t, func(mockUser *mock.MockUser, mockDB *mock.MockBase) {
+		mockDB.EXPECT().GetOutcomeSet(questionSetID, mockUser).Return(os, nil)
+		mockDB.EXPECT().GetOSMeetingsInTimeRange(start, end, questionSetID, mockUser).Return(inRangeMeetings, nil)
+		mockDB.EXPECT().GetOSMeetingsForBeneficiary("B1", questionSetID, mockUser).Return(b1Meetings, nil)
+		mockDB.EXPECT().GetOSMeetingsForBeneficiary("B2", questionSetID, mockUser).Return(b2Meetings, nil)
+
+		result, err := logic.GetJOCServiceReport(start, end, questionSetID, mockDB, mockUser)
+		assert.NoError(t, err)
+		assert.Len(t, result.Excluded.QuestionIDs, 0)
+		assert.Len(t, result.Warnings, 0)
+		for _, qba := range result.QuestionAggregates.First {
+			if qba.QuestionID == questionRemoved {
+				assert.NotContains(t, qba.BeneficiaryIDs, "B1")
+				assert.Regexp(t, regexp.MustCompile("Beneficiary B1 not included .* question was not answered in both .*"), qba.Warnings[0])
+			}
+		}
+		for _, qba := range result.QuestionAggregates.Last {
+			if qba.QuestionID == questionRemoved {
+				assert.NotContains(t, qba.BeneficiaryIDs, "B1")
+				assert.Regexp(t, regexp.MustCompile("Beneficiary B1 not included .* question was not answered in both .*"), qba.Warnings[0])
+			}
+		}
+		for _, qba := range result.QuestionAggregates.Delta {
+			if qba.QuestionID == questionRemoved {
+				assert.NotContains(t, qba.BeneficiaryIDs, "B1")
+				assert.Regexp(t, regexp.MustCompile("Beneficiary B1 not included .* question was not answered in both .*"), qba.Warnings[0])
+			}
+		}
+	})
+}
+
+func TestBenMeetingFailure(t *testing.T) {
+	end := time.Unix(10000, 0)
+	start := end.Add(-time.Hour * 24)
+	os := getDefaultOutcomeSet(questionSetID)
+	meetings := getDefaultMeetings(start, end, questionSetID)
+
+	inRangeMeetings := []impact.Meeting{meetings["B1M1"], meetings["B2M1"]}
+	b1Meetings := []impact.Meeting{meetings["B1M1"], meetings["B1M2"]}
+	b2Meetings := []impact.Meeting{meetings["B2M1"], meetings["B1M2"]}
+
+	e := errors.New("test error")
+
+	setupWrapper(t, func(mockUser *mock.MockUser, mockDB *mock.MockBase) {
+		mockDB.EXPECT().GetOutcomeSet(questionSetID, mockUser).Return(os, nil)
+		mockDB.EXPECT().GetOSMeetingsInTimeRange(start, end, questionSetID, mockUser).Return(inRangeMeetings, nil)
+		mockDB.EXPECT().GetOSMeetingsForBeneficiary("B1", questionSetID, mockUser).Return(b1Meetings, nil)
+		mockDB.EXPECT().GetOSMeetingsForBeneficiary("B2", questionSetID, mockUser).Return(b2Meetings, e)
+
+		result, err := logic.GetJOCServiceReport(start, end, questionSetID, mockDB, mockUser)
+		assert.NoError(t, err)
+		assert.Len(t, result.Warnings, 1)
+		assert.Regexp(t, regexp.MustCompile("Could not include beneficiary B2 due to an system error.*"), result.Warnings[0])
+	})
+}
